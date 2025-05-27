@@ -38,7 +38,6 @@ export const joinQueue = async (req, res) => {
   try {
     const { businessId, service } = req.body;
 
-    // Check if business exists
     const business = await User.findOne({ _id: businessId, role: 'business' });
     if (!business) {
       return res.status(404).json({
@@ -47,7 +46,6 @@ export const joinQueue = async (req, res) => {
       });
     }
 
-    // Check if user is already in a queue
     const existingQueue = await Queue.getCustomerActiveQueue(req.user._id);
     if (existingQueue) {
       return res.status(400).json({
@@ -59,7 +57,7 @@ export const joinQueue = async (req, res) => {
     // Calculate position and estimated wait time
     const activeQueues = await Queue.getActiveQueues(businessId);
     const position = activeQueues.length + 1;
-    const estimatedWait = position * 15; // Assuming 15 minutes per customer
+    const estimatedWait = position * 15;
 
     const queue = new Queue({
       businessId,

@@ -200,3 +200,162 @@ export const getBusinessInfo = async (req, res) => {
     });
   }
 };
+
+export const createQueue = async (req, res) => {
+  try {
+    const { service, estimatedWaitTime, maxCapacity } = req.body;
+    const businessId = req.user._id;
+
+    // Validate input
+    if (!service || !estimatedWaitTime) {
+      return res.status(400).json({
+        success: false,
+        message: 'Service and estimated wait time are required'
+      });
+    }
+
+    // Check if business exists
+    const business = await User.findOne({ _id: businessId, role: 'business' });
+    if (!business) {
+      return res.status(404).json({
+        success: false,
+        message: 'Business not found'
+      });
+    }
+
+    // Create new queue
+    const queue = new Queue({
+      businessId,
+      service,
+      estimatedWait: estimatedWaitTime,
+      maxCapacity: maxCapacity || null,
+      status: 'active'
+    });
+
+    await queue.save();
+
+    // Emit socket event for real-time updates
+    req.app.get('io').to(`business-${businessId}`).emit('queue-created', {
+      queue
+    });
+
+    return res.status(201).json({
+      success: true,
+      queue
+    });
+  } catch (error) {
+    console.error('Create queue error:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Error creating queue'
+    });
+  }
+};
+
+export const updateQueue = async (req, res) => {
+  try {
+    const { queueId } = req.params;
+    const { service, estimatedWaitTime, maxCapacity, status } = req.body;
+    const businessId = req.user._id;
+
+    // Find queue
+    const queue = await Queue.findOne({
+      _id: queueId,
+      businessId
+    });
+
+    if (!queue) {
+      return res.status(404).json({
+        success: false,
+        message: 'Queue not found'
+      });
+    }
+
+    // Update queue fields
+    if (service) queue.service = service;
+    if (estimatedWaitTime) queue.estimatedWait = estimatedWaitTime;
+    if (maxCapacity !== undefined) queue.maxCapacity = maxCapacity;
+    if (status) queue.status = status;
+
+    await queue.save();
+
+    // Emit socket event for real-time updates
+    req.app.get('io').to(`business-${businessId}`).emit('queue-updated', {
+      queue
+    });
+
+    return res.status(200).json({
+      success: true,
+      queue
+    });
+  } catch (error) {
+    console.error('Update queue error:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Error updating queue'
+    });
+  }
+};
+
+export const deleteQueue = async (req, res) => {
+  try {
+    const { queueId } = req.params;
+    const businessId = req.user._id;
+
+    const queue = await Queue.findOne({
+      _id: queueId,
+      businessId
+    });
+
+    if (!queue) {
+      return res.status(404).json({
+        success: false,
+        message: 'Queue not found'
+      });
+    }
+
+    await queue.remove();
+
+    // Emit socket event for real-time updates
+    req.app.get('io').to(`business-${businessId}`).emit('queue-deleted', {
+      queueId
+    });
+
+    return res.status(200).json({
+      success: true,
+      message: 'Queue deleted successfully'
+    });
+  } catch (error) {
+    console.error('Delete queue error:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Error deleting queue'
+    });
+  }
+};
+
+export const getBusinessQueues = async (req, res) => {
+  try {
+    const businessId = req.user._id;
+    const { status } = req.query;
+
+    const query = { businessId };
+    if (status) {
+      query.status = status;
+    }
+
+    const queues = await Queue.find(query)
+      .sort({ createdAt: -1 });
+
+    return res.status(200).json({
+      success: true,
+      queues
+    });
+  } catch (error) {
+    console.error('Get business queues error:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Error fetching business queues'
+    });
+  }
+};

@@ -66,7 +66,6 @@ queueSchema.statics.getActiveQueues = function (businessId) {
   }).sort({ createdAt: 1 });
 };
 
-// Static method to get customer's active queue
 queueSchema.statics.getCustomerActiveQueue = function (customerId) {
   return this.findOne({
     customerId,

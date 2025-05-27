@@ -3,7 +3,10 @@ import User from '../models/user.model.js';
 
 export const generateToken = (user) => {
   return jwt.sign(
-    { id: user._id },
+    {
+      id: user._id,
+      role: user.role
+    },
     process.env.JWT_SECRET,
     { expiresIn: '7d' }
   );
@@ -33,13 +36,13 @@ export const login = async (req, res) => {
     res.cookie('token', token, {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
+      sameSite: 'strict',
       maxAge: 7 * 24 * 60 * 60 * 1000 // 7 days
     });
 
     res.json({
       success: true,
-      user: user.getPublicProfile(),
-      token
+      user: user.getPublicProfile()
     });
   } catch (error) {
     res.status(500).json({
@@ -51,7 +54,7 @@ export const login = async (req, res) => {
 
 export const signup = async (req, res) => {
   try {
-    const { name, email, password, role, phoneNumber, notificationPreferences } = req.body;
+    const { name, email, password, role } = req.body;
 
     const existingUser = await User.findOne({ email });
     if (existingUser) {
@@ -65,9 +68,7 @@ export const signup = async (req, res) => {
       name,
       email,
       password,
-      role,
-      phoneNumber,
-      notificationPreferences
+      role: role || 'USER' // Default to USER if role not provided
     });
 
     await user.save();
@@ -76,15 +77,22 @@ export const signup = async (req, res) => {
     res.cookie('token', token, {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
+      sameSite: 'strict',
       maxAge: 7 * 24 * 60 * 60 * 1000 // 7 days
     });
 
-    res.status(201).json({
+    return res.status(201).json({
       success: true,
-      user: user.getPublicProfile(),
-      token
+      user: user.getPublicProfile()
     });
   } catch (error) {
+    console.error('Signup error:', error);
+    if (error.name === 'ValidationError') {
+      return res.status(400).json({
+        success: false,
+        message: Object.values(error.errors).map(err => err.message).join(', ')
+      });
+    }
     res.status(500).json({
       success: false,
       message: 'Error creating account'
@@ -104,7 +112,10 @@ export const validateToken = async (req, res) => {
     }
 
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    const user = await User.findOne({ _id: decoded.id });
+    const user = await User.findOne({
+      _id: decoded.id,
+      role: decoded.role // Verify that the role matches
+    });
 
     if (!user) {
       return res.json({
@@ -118,6 +129,7 @@ export const validateToken = async (req, res) => {
       user: user.getPublicProfile()
     });
   } catch (error) {
+    console.error('Token validation error:', error);
     res.json({
       success: true,
       user: null

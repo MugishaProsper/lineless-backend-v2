@@ -5,7 +5,6 @@ export const submitRating = async (req, res) => {
   try {
     const { businessId, rating, comment } = req.body;
 
-    // Check if user has completed a queue with this business
     const completedQueue = await Queue.findOne({
       customerId: req.user._id,
       businessId,
