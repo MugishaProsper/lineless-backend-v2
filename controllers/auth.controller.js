@@ -16,6 +16,14 @@ export const login = async (req, res) => {
   try {
     const { email, password } = req.body;
 
+    // Validate input
+    if (!email || !password) {
+      return res.status(400).json({
+        success: false,
+        message: 'Email and password are required'
+      });
+    }
+
     const user = await User.findOne({ email });
     if (!user) {
       return res.status(401).json({
@@ -23,6 +31,9 @@ export const login = async (req, res) => {
         message: 'Invalid email or password'
       });
     }
+
+    // Debug log
+    console.log('Login attempt:', { email, hasPassword: !!password, hasStoredPassword: !!user.password });
 
     const isMatch = await user.comparePassword(password);
     if (!isMatch) {
@@ -45,6 +56,7 @@ export const login = async (req, res) => {
       user: user.getPublicProfile()
     });
   } catch (error) {
+    console.error('Login error:', error);
     res.status(500).json({
       success: false,
       message: 'Error logging in'
@@ -124,13 +136,13 @@ export const validateToken = async (req, res) => {
       });
     }
 
-    res.json({
+    return res.json({
       success: true,
       user: user.getPublicProfile()
     });
   } catch (error) {
     console.error('Token validation error:', error);
-    res.json({
+    return res.json({
       success: true,
       user: null
     });

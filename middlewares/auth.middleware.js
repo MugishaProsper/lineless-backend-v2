@@ -32,7 +32,11 @@ export const auth = async (req, res, next) => {
 
 export const authorize = (...roles) => {
   return (req, res, next) => {
-    if (!roles.includes(req.user.role)) {
+    // Normalize the user's role to lowercase for case-insensitive comparison
+    const userRole = req.user.role.toLowerCase();
+    const allowedRoles = roles.map(role => role.toLowerCase());
+
+    if (!allowedRoles.includes(userRole)) {
       return res.status(403).json({
         success: false,
         message: 'You do not have permission to perform this action'

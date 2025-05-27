@@ -206,6 +206,8 @@ export const createQueue = async (req, res) => {
     const { service, estimatedWaitTime, maxCapacity } = req.body;
     const businessId = req.user._id;
 
+    console.log('Attempting to create service for business ID:', businessId);
+
     // Validate input
     if (!service || !estimatedWaitTime) {
       return res.status(400).json({

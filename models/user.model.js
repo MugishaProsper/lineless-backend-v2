@@ -5,9 +5,9 @@ const userSchema = new mongoose.Schema({
   name: { type: String, required: true, trim: true },
   email: { type: String, required: true, unique: true, trim: true, lowercase: true },
   password: { type: String, required: true, minlength: 6 },
-  role: { type: String, enum: ['USER', 'BUSINESS'], default : 'USER' },
+  role: { type: String, enum: ['user', 'business'], default: 'user' },
   phoneNumber: { type: String, trim: true }
-}, { timestamps: true});
+}, { timestamps: true });
 
 // Hash password before saving
 userSchema.pre('save', async function (next) {
@@ -24,6 +24,9 @@ userSchema.pre('save', async function (next) {
 
 // Method to compare password
 userSchema.methods.comparePassword = async function (candidatePassword) {
+  if (!candidatePassword || !this.password) {
+    throw new Error('Password comparison failed: missing password');
+  }
   return bcrypt.compare(candidatePassword, this.password);
 };
 

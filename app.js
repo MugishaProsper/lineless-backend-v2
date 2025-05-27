@@ -15,6 +15,7 @@ import queue_router from './routes/queue.routes.js';
 import business_router from './routes/business.routes.js'
 import user_router from './routes/user.routes.js'
 import rating_router from './routes/rating.routes.js'
+import service_router from './routes/service.routes.js';
 import { connectToDB } from './config/db.config.js';
 
 const app = express();
@@ -49,6 +50,7 @@ app.use('/api/queues', queue_router);
 app.use('/api/business', business_router);
 app.use('/api/users', user_router);
 app.use('/api/ratings', rating_router);
+app.use('/api/services', service_router);
 
 // Error handling middleware
 app.use((err, req, res, next) => {
