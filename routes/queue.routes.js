@@ -1,27 +1,24 @@
 import express from 'express';
-import { body } from 'express-validator';
 import { auth, authorize } from '../middlewares/auth.middleware.js';
 import {
-  getUserQueues,
-  getBusinessQueue,
-  joinQueue,
-  leaveQueue,
-  callNext
+  addQueueToService,
+  removeQueueFromService,
+  getServiceQueues,
+  getQueueCount
 } from '../controllers/queue.controller.js';
 
 const queue_router = express.Router();
 
-// Validation middleware
-const joinQueueValidation = [
-  body('businessId').isMongoId().withMessage('Invalid business ID'),
-  body('service').trim().notEmpty().withMessage('Service is required')
-];
+// Add queue to a service
+queue_router.post('/service/:id/queue', auth, authorize('business'), addQueueToService);
 
-// Routes
-queue_router.get('/user/:userId', auth, getUserQueues);
-queue_router.get('/business/:businessId', auth, authorize('business'), getBusinessQueue);
-queue_router.post('/join', auth, authorize('user'), joinQueueValidation, joinQueue);
-queue_router.delete('/:queueId', auth, leaveQueue);
-queue_router.post('/business/:businessId/call-next', auth, authorize('business'), callNext);
+// Remove queue from a service
+queue_router.delete('/service/:id/queue/:queueId', auth, authorize('business'), removeQueueFromService);
+
+// Get all queues for a service
+queue_router.get('/service/:id/queues', auth, authorize('business'), getServiceQueues);
+
+// Get queue count for a service
+queue_router.get('/service/:id/queue/count', auth, authorize('business'), getQueueCount);
 
 export default queue_router;

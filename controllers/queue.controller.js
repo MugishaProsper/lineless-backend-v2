@@ -1,158 +1,118 @@
+import Service from "../models/service.model.js";
 import Queue from "../models/queue.model.js";
-import User from "../models/user.model.js";
 
-export const getUserQueues = async (req, res) => {
+// New methods for queue manipulation
+export const addQueueToService = async (req, res) => {
   try {
-    const queues = await Queue.find({ customerId: req.user._id })
-      .sort({ createdAt: -1 })
-      .populate('businessId', 'name');
-
-    res.json({
-      success: true,
-      queues
+    const service = await Service.findOne({
+      _id: req.params.id,
+      businessId: req.user._id
     });
-  } catch (error) {
-    res.status(500).json({
-      success: false,
-      message: 'Error fetching queues'
-    });
-  }
-};
-
-export const getBusinessQueue = async (req, res) => {
-  try {
-    const queues = await Queue.getActiveQueues(req.user._id);
-    res.json({
-      success: true,
-      queues
-    });
-  } catch (error) {
-    res.status(500).json({
-      success: false,
-      message: 'Error fetching business queue'
-    });
-  }
-};
-
-export const joinQueue = async (req, res) => {
-  try {
-    const { businessId, service } = req.body;
-
-    const business = await User.findOne({ _id: businessId, role: 'business' });
-    if (!business) {
+    
+    if (!service) {
       return res.status(404).json({
         success: false,
-        message: 'Business not found'
+        message: "Service not found"
       });
     }
-
-    const existingQueue = await Queue.getCustomerActiveQueue(req.user._id);
-    if (existingQueue) {
-      return res.status(400).json({
-        success: false,
-        message: 'You are already in a queue'
-      });
-    }
-
-    // Calculate position and estimated wait time
-    const activeQueues = await Queue.getActiveQueues(businessId);
-    const position = activeQueues.length + 1;
-    const estimatedWait = position * 15;
 
     const queue = new Queue({
-      businessId,
-      customerId: req.user._id,
-      customerName: req.user.name,
-      service,
-      position,
-      estimatedWait
+      serviceId: service._id
     });
-
+    
     await queue.save();
-
-    // Emit socket event for real-time updates
-    req.app.get('io').to(`queue-${businessId}`).emit('queue-update', {
-      type: 'join',
-      queue
-    });
-
+    await service.addQueue(queue._id);
+    
     return res.status(201).json({
       success: true,
-      queue
+      data: queue
     });
   } catch (error) {
-    return res.status(500).json({
-      success: false,
-      message: 'Error joining queue'
-    });
+    console.log(error);
+    return res.status(500).json({ message: "Internal Server error" });
   }
 };
 
-export const leaveQueue = async (req, res) => {
+export const removeQueueFromService = async (req, res) => {
   try {
-    const queue = await Queue.findOne({
-      _id: req.params.queueId,
-      customerId: req.user._id
+    const { queueId } = req.params;
+    const service = await Service.findOne({
+      _id: req.params.id,
+      businessId: req.user._id
     });
-
-    if (!queue) {
+    
+    if (!service) {
       return res.status(404).json({
         success: false,
-        message: 'Queue not found'
+        message: "Service not found"
       });
     }
 
-    await queue.remove();
-
-    // Emit socket event for real-time updates
-    req.app.get('io').to(`queue-${queue.businessId}`).emit('queue-update', {
-      type: 'leave',
-      queueId: queue._id
-    });
-
+    await service.removeQueue(queueId);
+    await Queue.findByIdAndDelete(queueId);
+    
     return res.status(200).json({
       success: true,
-      message: 'Left queue successfully'
+      message: "Queue removed successfully"
     });
   } catch (error) {
-    return res.status(500).json({
-      success: false,
-      message: 'Error leaving queue'
-    });
+    console.log(error);
+    return res.status(500).json({ message: "Internal Server error" });
   }
 };
 
-export const callNext = async (req, res) => {
+export const getServiceQueues = async (req, res) => {
   try {
-    const nextCustomer = await Queue.findOne({
-      businessId: req.user._id,
-      status: 'waiting'
-    }).sort({ createdAt: 1 });
-
-    if (!nextCustomer) {
-      return res.json({
-        success: true,
-        nextCustomer: null
+    const service = await Service.findOne({
+      _id: req.params.id,
+      businessId: req.user._id
+    }).populate({
+      path: 'queueMembers',
+      populate: {
+        path: 'queueMembers.user',
+        select: 'name email'
+      }
+    });
+    
+    if (!service) {
+      return res.status(404).json({
+        success: false,
+        message: "Service not found"
       });
     }
-
-    nextCustomer.status = 'called';
-    await nextCustomer.save();
-
-    // Emit socket event for real-time updates
-    req.app.get('io').to(`queue-${req.user._id}`).emit('queue-update', {
-      type: 'call-next',
-      queue: nextCustomer
-    });
-
+    
     return res.status(200).json({
       success: true,
-      nextCustomer
+      data: service.queueMembers
     });
   } catch (error) {
-    return res.status(500).json({
-      success: false,
-      message: 'Error calling next customer'
+    console.log(error);
+    return res.status(500).json({ message: "Internal Server error" });
+  }
+};
+
+export const getQueueCount = async (req, res) => {
+  try {
+    const service = await Service.findOne({
+      _id: req.params.id,
+      businessId: req.user._id
     });
+    
+    if (!service) {
+      return res.status(404).json({
+        success: false,
+        message: "Service not found"
+      });
+    }
+    
+    const count = service.getQueueCount();
+    
+    return res.status(200).json({
+      success: true,
+      data: { count }
+    });
+  } catch (error) {
+    console.log(error);
+    return res.status(500).json({ message: "Internal Server error" });
   }
 };

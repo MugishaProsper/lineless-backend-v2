@@ -1,106 +1,126 @@
 import User from "../models/user.model.js";
 import Queue from "../models/queue.model.js";
-import Rating from "../models/rating.model.js";
-
-export const getUserHistory = async (req, res) => {
-  try {
-    const page = parseInt(req.query.page) || 1;
-    const limit = parseInt(req.query.limit) || 10;
-
-    const queues = await Queue.find({
-      customerId: req.user._id,
-      status: { $in: ['completed', 'cancelled'] }
-    })
-      .sort({ createdAt: -1 })
-      .skip((page - 1) * limit)
-      .limit(limit)
-      .populate('businessId', 'name');
-
-    const total = await Queue.countDocuments({
-      customerId: req.user._id,
-      status: { $in: ['completed', 'cancelled'] }
-    });
-
-    return res.json({
-      success: true,
-      history: queues,
-      pagination: {
-        page,
-        limit,
-        total,
-        pages: Math.ceil(total / limit)
-      }
-    });
-  } catch (error) {
-    return res.status(500).json({
-      success: false,
-      message: 'Error fetching user history'
-    });
-  }
-};
 
 export const updateProfile = async (req, res) => {
   try {
-    const { name, email, phoneNumber, notificationPreferences } = req.body;
+    const { name, email, phoneNumber } = req.body;
+    const userId = req.user._id;
 
-    // Check if email is already taken by another user
-    if (email !== req.user.email) {
-      const existingUser = await User.findOne({ email });
-      if (existingUser) {
-        return res.status(400).json({
-          success: false,
-          message: 'Email already taken'
-        });
-      }
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: "User not found"
+      });
     }
 
-    const updates = {
-      name,
-      email,
-      phoneNumber,
-      notificationPreferences
-    };
+    if (name) user.name = name;
+    if (email) user.email = email;
+    if (phoneNumber) user.phoneNumber = phoneNumber;
 
-    Object.keys(updates).forEach(key => {
-      if (updates[key] !== undefined) {
-        req.user[key] = updates[key];
-      }
-    });
-
-    await req.user.save();
+    await user.save();
 
     return res.status(200).json({
       success: true,
-      user: req.user.getPublicProfile()
+      data: user
     });
   } catch (error) {
-    return res.status(500).json({
-      success: false,
-      message: 'Error updating profile'
-    });
+    console.log(error);
+    return res.status(500).json({ message: "Internal Server error" });
   }
 };
 
-export const deleteAccount = async (req, res) => {
+export const getUserProfile = async (req, res) => {
   try {
-    // Delete user's queues
-    await Queue.deleteMany({ customerId: req.user._id });
+    const user = await User.findById(req.user._id).select('-password');
+    
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: "User not found"
+      });
+    }
 
-    // Delete user's ratings
-    await Rating.deleteMany({ userId: req.user._id });
-
-    // Delete user account
-    await req.user.remove();
-
-    res.clearCookie('token');
-    return res.json({
+    return res.status(200).json({
       success: true,
-      message: 'Account deleted successfully'
+      data: user
     });
   } catch (error) {
-    return res.status(500).json({
-      success: false,
-      message: 'Error deleting account'
+    console.log(error);
+    return res.status(500).json({ message: "Internal Server error" });
+  }
+};
+
+export const changePassword = async (req, res) => {
+  try {
+    const { currentPassword, newPassword } = req.body;
+    const user = await User.findById(req.user._id);
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: "User not found"
+      });
+    }
+
+    const isMatch = await user.comparePassword(currentPassword);
+    if (!isMatch) {
+      return res.status(400).json({
+        success: false,
+        message: "Current password is incorrect"
+      });
+    }
+
+    user.password = newPassword;
+    await user.save();
+
+    return res.status(200).json({
+      success: true,
+      message: "Password updated successfully"
     });
+  } catch (error) {
+    console.log(error);
+    return res.status(500).json({ message: "Internal Server error" });
+  }
+};
+
+export const getUserQueues = async (req, res) => {
+  try {
+    const userId = req.user._id;
+    
+    // Find all queues where the user is a member
+    const queues = await Queue.find({ members: userId })
+      .populate('serviceId', 'serviceName serviceDescription')
+      .populate('businessId', 'name email phoneNumber');
+    
+    return res.status(200).json({
+      success: true,
+      data: queues
+    });
+  } catch (error) {
+    console.log(error);
+    return res.status(500).json({ message: "Internal Server error" });
+  }
+};
+
+export const getActiveUserQueues = async (req, res) => {
+  try {
+    const userId = req.user._id;
+    
+    // Find all active queues where the user is a member
+    const queues = await Queue.find({ 
+      members: userId,
+      status: "active"
+    })
+      .populate('serviceId', 'serviceName serviceDescription')
+      .populate('businessId', 'name email phoneNumber');
+    
+    return res.status(200).json({
+      success: true,
+      data: queues
+    });
+  } catch (error) {
+    console.log(error);
+    return res.status(500).json({ message: "Internal Server error" });
   }
 };

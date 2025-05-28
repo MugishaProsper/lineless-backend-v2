@@ -1,45 +1,38 @@
 import jwt from 'jsonwebtoken';
 import User from '../models/user.model.js';
+import dotenv from 'dotenv';
+
+dotenv.config();
 
 export const generateToken = (user) => {
-  return jwt.sign(
-    {
-      id: user._id,
-      role: user.role
-    },
-    process.env.JWT_SECRET,
-    { expiresIn: '7d' }
-  );
+  const payload = {
+    id: user._id,
+    name: user.name,
+    role: user.role
+  };
+  
+  return jwt.sign(payload, process.env.JWT_SECRET, {
+    expiresIn: '7d'
+  });
 };
 
 export const login = async (req, res) => {
+  const { email, password } = req.body;
   try {
-    const { email, password } = req.body;
-
-    // Validate input
-    if (!email || !password) {
-      return res.status(400).json({
-        success: false,
-        message: 'Email and password are required'
-      });
-    }
-
     const user = await User.findOne({ email });
+    
     if (!user) {
       return res.status(401).json({
         success: false,
-        message: 'Invalid email or password'
+        message: 'Invalid credentials'
       });
     }
-
-    // Debug log
-    console.log('Login attempt:', { email, hasPassword: !!password, hasStoredPassword: !!user.password });
 
     const isMatch = await user.comparePassword(password);
     if (!isMatch) {
       return res.status(401).json({
         success: false,
-        message: 'Invalid email or password'
+        message: 'Invalid credentials'
       });
     }
 
@@ -47,27 +40,22 @@ export const login = async (req, res) => {
     res.cookie('token', token, {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
-      sameSite: 'strict',
       maxAge: 7 * 24 * 60 * 60 * 1000 // 7 days
     });
 
-    res.json({
+    return res.status(200).json({
       success: true,
       user: user.getPublicProfile()
     });
   } catch (error) {
-    console.error('Login error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Error logging in'
-    });
+    console.log(error);
+    return res.status(500).json({ message: "Internal Server error" });
   }
 };
 
 export const signup = async (req, res) => {
+  const { name, email, password, role } = req.body;
   try {
-    const { name, email, password, role } = req.body;
-
     const existingUser = await User.findOne({ email });
     if (existingUser) {
       return res.status(400).json({
@@ -80,7 +68,7 @@ export const signup = async (req, res) => {
       name,
       email,
       password,
-      role: role || 'USER' // Default to USER if role not provided
+      role
     });
 
     await user.save();
@@ -89,7 +77,6 @@ export const signup = async (req, res) => {
     res.cookie('token', token, {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
-      sameSite: 'strict',
       maxAge: 7 * 24 * 60 * 60 * 1000 // 7 days
     });
 
@@ -98,17 +85,8 @@ export const signup = async (req, res) => {
       user: user.getPublicProfile()
     });
   } catch (error) {
-    console.error('Signup error:', error);
-    if (error.name === 'ValidationError') {
-      return res.status(400).json({
-        success: false,
-        message: Object.values(error.errors).map(err => err.message).join(', ')
-      });
-    }
-    res.status(500).json({
-      success: false,
-      message: 'Error creating account'
-    });
+    console.log(error);
+    return res.status(500).json({ message: "Internal Server error" });
   }
 };
 
@@ -126,7 +104,7 @@ export const validateToken = async (req, res) => {
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
     const user = await User.findOne({
       _id: decoded.id,
-      role: decoded.role // Verify that the role matches
+      role: decoded.role
     });
 
     if (!user) {

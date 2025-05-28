@@ -46,7 +46,7 @@ app.use(limiter);
 
 // Routes
 app.use('/api/auth', auth_router);
-app.use('/api/queues', queue_router);
+app.use('/api/queue', queue_router);
 app.use('/api/business', business_router);
 app.use('/api/users', user_router);
 app.use('/api/ratings', rating_router);

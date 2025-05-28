@@ -1,112 +1,146 @@
-import Service from '../models/service.model.js';
+import Service from "../models/service.model.js";
 
-// Get all services for a business
-export const getBusinessServices = async (req, res) => {
+export const createService = async (req, res) => {
+  const { serviceName, serviceDescription, startDate, endDate } = req.body;
+  const userId = req.user._id;
   try {
-    const businessId = req.user._id;
-    const services = await Service.find({ businessId });
-    res.status(200).json({
-      success: true,
-      services,
-    });
-  } catch (error) {
-    console.error('Error fetching business services:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Error fetching business services',
-    });
-  }
-};
-
-// Create a new service for a business
-export const createBusinessService = async (req, res) => {
-  try {
-    const businessId = req.user._id;
-    const { serviceName, estimatedWaitTime, maxCapacity, isActive } = req.body;
-
     const service = new Service({
-      businessId,
+      businessId: userId,
       serviceName,
-      estimatedWaitTime,
-      maxCapacity,
-      isActive,
+      serviceDescription,
+      startTime: startDate,
+      endTime: endDate
     });
-
+    
     await service.save();
-
-    res.status(201).json({
+    return res.status(201).json({
       success: true,
-      service,
+      data: service
     });
   } catch (error) {
-    console.error('Error creating business service:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Error creating business service',
-    });
+    console.log(error);
+    return res.status(500).json({ message: "Internal Server error" });
   }
 };
 
-// Update a service
-export const updateBusinessService = async (req, res) => {
+export const getServices = async (req, res) => {
   try {
-    const businessId = req.user._id;
-    const { serviceId } = req.params;
-    const updates = req.body;
+    const services = await Service.find({ businessId: req.user._id })
+      .populate('queueMembers');
+    
+    return res.status(200).json({
+      success: true,
+      data: services
+    });
+  } catch (error) {
+    console.log(error);
+    return res.status(500).json({ message: "Internal Server error" });
+  }
+};
 
-    const service = await Service.findOneAndUpdate(
-      { _id: serviceId, businessId },
-      updates,
-      { new: true, runValidators: true }
-    );
-
+export const getServiceById = async (req, res) => {
+  try {
+    const service = await Service.findOne({
+      _id: req.params.id,
+      businessId: req.user._id
+    }).populate('queueMembers');
+    
     if (!service) {
       return res.status(404).json({
         success: false,
-        message: 'Service not found or you do not own this service',
+        message: "Service not found"
       });
     }
-
-    res.status(200).json({
+    
+    return res.status(200).json({
       success: true,
-      service,
+      data: service
     });
   } catch (error) {
-    console.error('Error updating business service:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Error updating business service',
-    });
+    console.log(error);
+    return res.status(500).json({ message: "Internal Server error" });
   }
 };
 
-// Delete a service
-export const deleteBusinessService = async (req, res) => {
+export const updateService = async (req, res) => {
+  const { serviceName, serviceDescription, startDate, endDate, status } = req.body;
   try {
-    const businessId = req.user._id;
-    const { serviceId } = req.params;
+    const service = await Service.findOne({
+      _id: req.params.id,
+      businessId: req.user._id
+    });
+    
+    if (!service) {
+      return res.status(404).json({
+        success: false,
+        message: "Service not found"
+      });
+    }
+    
+    if (serviceName) service.serviceName = serviceName;
+    if (serviceDescription) service.serviceDescription = serviceDescription;
+    if (startDate) service.startTime = startDate;
+    if (endDate) service.endTime = endDate;
+    if (status) await service.updateStatus(status);
+    
+    await service.save();
+    
+    return res.status(200).json({
+      success: true,
+      data: service
+    });
+  } catch (error) {
+    console.log(error);
+    return res.status(500).json({ message: "Internal Server error" });
+  }
+};
 
+export const deleteService = async (req, res) => {
+  try {
     const service = await Service.findOneAndDelete({
-      _id: serviceId,
-      businessId,
+      _id: req.params.id,
+      businessId: req.user._id
     });
-
+    
     if (!service) {
       return res.status(404).json({
         success: false,
-        message: 'Service not found or you do not own this service',
+        message: "Service not found"
       });
     }
-
-    res.status(200).json({
+    
+    return res.status(200).json({
       success: true,
-      message: 'Service deleted successfully',
+      message: "Service deleted successfully"
     });
   } catch (error) {
-    console.error('Error deleting business service:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Error deleting business service',
-    });
+    console.log(error);
+    return res.status(500).json({ message: "Internal Server error" });
   }
-}; 
+};
+
+export const getServiceAnalytics = async (req, res) => {
+  try {
+    const service = await Service.findOne({
+      _id: req.params.id,
+      businessId: req.user._id
+    });
+    
+    if (!service) {
+      return res.status(404).json({
+        success: false,
+        message: "Service not found"
+      });
+    }
+    
+    const analytics = await service.getAnalytics();
+    
+    return res.status(200).json({
+      success: true,
+      data: analytics
+    });
+  } catch (error) {
+    console.log(error);
+    return res.status(500).json({ message: "Internal Server error" });
+  }
+};
