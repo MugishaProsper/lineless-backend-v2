@@ -124,3 +124,26 @@ export const getActiveUserQueues = async (req, res) => {
     return res.status(500).json({ message: "Internal Server error" });
   }
 };
+
+export const deleteAccount = async (req, res) => {
+  try {
+    const userId = req.user._id;
+    
+    // Find and delete all queues where user is a member
+    await Queue.updateMany(
+      { members: userId },
+      { $pull: { members: userId } }
+    );
+    
+    // Delete the user account
+    await User.findByIdAndDelete(userId);
+    
+    return res.status(200).json({
+      success: true,
+      message: "Account deleted successfully"
+    });
+  } catch (error) {
+    console.log(error);
+    return res.status(500).json({ message: "Internal Server error" });
+  }
+};

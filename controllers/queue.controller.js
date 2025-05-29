@@ -8,7 +8,7 @@ export const addQueueToService = async (req, res) => {
       _id: req.params.id,
       businessId: req.user._id
     });
-    
+
     if (!service) {
       return res.status(404).json({
         success: false,
@@ -19,10 +19,10 @@ export const addQueueToService = async (req, res) => {
     const queue = new Queue({
       serviceId: service._id
     });
-    
+
     await queue.save();
     await service.addQueue(queue._id);
-    
+
     return res.status(201).json({
       success: true,
       data: queue
@@ -40,7 +40,7 @@ export const removeQueueFromService = async (req, res) => {
       _id: req.params.id,
       businessId: req.user._id
     });
-    
+
     if (!service) {
       return res.status(404).json({
         success: false,
@@ -50,7 +50,7 @@ export const removeQueueFromService = async (req, res) => {
 
     await service.removeQueue(queueId);
     await Queue.findByIdAndDelete(queueId);
-    
+
     return res.status(200).json({
       success: true,
       message: "Queue removed successfully"
@@ -73,14 +73,14 @@ export const getServiceQueues = async (req, res) => {
         select: 'name email'
       }
     });
-    
+
     if (!service) {
       return res.status(404).json({
         success: false,
         message: "Service not found"
       });
     }
-    
+
     return res.status(200).json({
       success: true,
       data: service.queueMembers
@@ -97,16 +97,16 @@ export const getQueueCount = async (req, res) => {
       _id: req.params.id,
       businessId: req.user._id
     });
-    
+
     if (!service) {
       return res.status(404).json({
         success: false,
         message: "Service not found"
       });
     }
-    
+
     const count = service.getQueueCount();
-    
+
     return res.status(200).json({
       success: true,
       data: { count }

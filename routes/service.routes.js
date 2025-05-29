@@ -17,6 +17,6 @@ service_router.get('/', auth, authorize('business'), getServices);
 service_router.get('/:id', auth, authorize('business'), getServiceById);
 service_router.put('/:id', auth, authorize('business'), updateService);
 service_router.delete('/:id', auth, authorize('business'), deleteService);
-service_router.get('/analytics', auth, authorize('business'), getServiceAnalytics);
+service_router.get('/:id/analytics', auth, authorize('business'), getServiceAnalytics);
 
 export default service_router;
